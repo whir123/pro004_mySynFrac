@@ -247,11 +247,12 @@ function makeField(nx, ny, Lx, Ly, H, ax, ay, th, rng) {
 }
 
 export function generateAUPG({
+  // 没传入参数时的默认值：
   nx = 512,
   ny = 512,
   L = 0.1, // 正方域 (m)；分辨率 64/128/256/512/1024
   D = 2.1, // 分形维数
-  sigma = 0.001, // RMS 高度 (m)
+  sigma = 0.01, // RMS 高度 (m)
   anisotropy = 1.0,
   thetaDeg = 0, // 各向异性与旋转
   mfmin = 0.0,

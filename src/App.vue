@@ -86,7 +86,7 @@ const seed2 = ref(737375979) // 噪声 N 的随机种子
 const sizeMM = ref(100) // 物理尺寸（mm）
 const mismatchMM = ref(15)   // ML （mm）
 const transitionMM = ref(10) // TL （mm）
-const stdMM = ref(1.0) // σz (mm)
+const stdMM = ref(10.0) // σz (mm)
 const aniso = ref(1.0) // 各向异性 x相对于y
 const D = ref(2.5) // 分形维数
 const mfmax = ref(1.0) // 长波极限相关
@@ -99,22 +99,47 @@ const L = computed(() => sizeMM.value / 1000) // mm → m
 const ZB = ref(null) // 生成的 Bottom 面高程矩阵（二维数组 ny × nx）
 const info = ref('')
 
+// ========= 把 z 重标定为标准差的指定范围 =========
+function remapZ_toRangeZero(z, targetRange) {
+  const ny = z.length, nx = z[0].length
+  let zmin = Infinity, zmax = -Infinity
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const v = z[j][i]
+    if (v < zmin) zmin = v
+    if (v > zmax) zmax = v
+  }
+  const range0 = zmax - zmin
+  if (!(targetRange > 0)) return z.map(row => row.slice())
+  if (!(range0 > 0) || !isFinite(range0)) return z.map(row => row.map(() => 0))
+  const mid0 = 0.5 * (zmax + zmin)
+  const s = targetRange / range0
+  const out = Array.from({ length: ny }, (_, j) => new Array(nx))
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) out[j][i] = (z[j][i] - mid0) * s
+  return out
+}
+
+// ========= 生成后立刻重标定 预览为“重标定后” =========
 function run() {
   const t0 = performance.now()
   const { ZB: bottom } = generateAUPG({
     nx: nx.value, ny: ny.value, L: L.value,
     D: D.value,
-    sigma: stdMM.value / 1000,     // mm -> m
+    sigma: stdMM.value / 1000, // 生成阶段仍用 sigma（不影响导出阶段重标定）
     anisotropy: aniso.value,
     mfmin: mfmin.value, mfmax: mfmax.value,
-    TL: transitionMM.value / 1000, // mm -> m
-    ML: mismatchMM.value / 1000,   // mm -> m
+    TL: transitionMM.value / 1000,
+    ML: mismatchMM.value / 1000,
     rngKind: rng.value, seed1: seed1.value, seed2: seed2.value
   })
-  ZB.value = bottom
+  // 立刻按 “Standard deviation (mm)” 作为上下峰值范围进行重标定，并把中面移到 0
+  const targetRange_m = (stdMM.value || 0) / 1000
+  ZB.value = remapZ_toRangeZero(bottom, targetRange_m)
+
+  // info 保留原来的格式
   info.value = `${res.value}×${res.value} | D=${D.value.toFixed(2)} | ${(performance.now() - t0).toFixed(0)} ms`
 }
 
+// ========= 保存：仅导出一次最终结果 =========
 function saveBlob(blob, filename) {
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
@@ -123,10 +148,9 @@ function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }
 
-// gridToSTL 把 ZB + 物理尺寸 Lx/Ly 网格化为三角片，输出 ASCII STL 的 Blob
 function exportSTL() {
   if (!ZB.value) return
-  const blob = gridToSTL(ZB.value, L.value, L.value, 'surface_bottom')
-  saveBlob(blob, 'surface_bottom.stl')
+  const finalBlob = gridToSTL(ZB.value, L.value, L.value, 'surface_bottom')
+  saveBlob(finalBlob, 'surface_bottom.stl')
 }
 </script>
