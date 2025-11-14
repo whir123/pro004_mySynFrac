@@ -1,5 +1,5 @@
-// ===== RNGs =====
-class ParkMiller {
+// ===== RNGs 随机数发生器部分 =====
+class ParkMiller { // 经典线性同余随机数发生器
   constructor(s = 1) {
     this.m = 2147483647;
     this.a = 16807;
@@ -7,10 +7,10 @@ class ParkMiller {
   }
   next() {
     this.state = (this.a * this.state) % this.m;
-    return this.state / this.m;
+    return this.state / this.m; // 变成0~1区间双精度浮点数
   }
 }
-class BaysDurham {
+class BaysDurham { // 在 ParkMiller 上叠加一个 Bays-Durham shuffle，减弱低维相关
   constructor(s = 1, n = 32) {
     this.pm = new ParkMiller(s);
     this.n = n;
@@ -23,7 +23,7 @@ class BaysDurham {
     return r;
   }
 }
-class Lecuyer {
+class Lecuyer { // L’Ecuyer 组合乘同余生成器
   constructor(s = 1) {
     this.IM1 = 2147483563;
     this.IM2 = 2147483399;
@@ -81,17 +81,18 @@ function makeRNG(kind, seed) {
   }
 }
 
-// ===== utils =====
+// ===== utils 工具函数 =====
+// 创建 ny × nx 的二维数组，初始元素填充值 v
 const create2D = (ny, nx, v = 0) =>
   Array.from({ length: ny }, () => new Array(nx).fill(v));
-
+// 构造一个长度为 n 的一维数组：0..h：就是 0,1,2,...,h | h+1..n-1：是 i-n，变成负数段 -(n-1),..., -1
 const lin = (n, s) => {
   const a = new Array(n),
     h = Math.floor(n / 2);
   for (let i = 0; i < n; i++) a[i] = (i <= h ? i : i - n) * s;
   return a;
 };
-
+// 对波数向量 (kx, ky) 先旋转，再按各向异性拉伸，再求平方模
 function rotk2(kx, ky, th, ax, ay) {
   const c = Math.cos(th),
     s = Math.sin(th);
@@ -101,14 +102,13 @@ function rotk2(kx, ky, th, ax, ay) {
     ya = yr / ay;
   return xa * xa + ya * ya;
 }
-
+// 让频谱满足厄米共轭对称
 function enforceHermitian(Re, Im) {
-  const ny = Re.length,
-    nx = Re[0].length;
+  const ny = Re.length, nx = Re[0].length;
+  // 对每个 (i,j) 计算对称点 (ii, jj) = (-i mod nx, -j mod ny) | 把对称点的实部设置为原点的实部，虚部取相反数
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
-      const jj = (ny - j) % ny,
-        ii = (nx - i) % nx;
+      const jj = (ny - j) % ny, ii = (nx - i) % nx;
       if (j > 0 || i > 0) {
         Re[jj][ii] = Re[j][i];
         Im[jj][ii] = -Im[j][i];
@@ -118,37 +118,33 @@ function enforceHermitian(Re, Im) {
   Re[0][0] = 0;
   Im[0][0] = 0; // 零均值
 }
-
+// 遍历整个高度场 z，求和 s 和平方和 s2，统计整体均值和方差
 function rescale(z, targetStd) {
-  const ny = z.length,
-    nx = z[0].length;
-  let s = 0,
-    s2 = 0,
-    n = nx * ny;
-  for (let j = 0; j < ny; j++)
+  const ny = z.length, nx = z[0].length;
+  let s = 0, s2 = 0, n = nx * ny;
+  for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       s += z[j][i];
       s2 += z[j][i] * z[j][i];
     }
-  const m = s / n,
-    sd = Math.sqrt(Math.max(1e-20, s2 / n - m * m));
+  };
+  const m = s / n, sd = Math.sqrt(Math.max(1e-20, s2 / n - m * m));
   const r = targetStd / (sd || 1);
-  for (let j = 0; j < ny; j++)
-    for (let i = 0; i < nx; i++) z[j][i] = (z[j][i] - m) * r;
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {z[j][i] = (z[j][i] - m) * r;}
+  };
   return z;
 }
 
-// ===== radix-2 FFT/IFFT =====
-function bitrev(n) {
-  const r = new Array(n),
-    b = Math.log2(n) | 0;
+// ===== radix-2 FFT/IFFT 标准的基 2 FFT 实现 =====
+function bitrev(n) { // 输入 n 必须是 2 的幂
+  const r = new Array(n), b = Math.log2(n) | 0;
   for (let i = 0; i < n; i++) {
-    let x = i,
-      y = 0;
+    let x = i, y = 0;
     for (let k = 0; k < b; k++) {
       y = (y << 1) | (x & 1);
       x >>= 1;
-    }
+    };
     r[i] = y;
   }
   return r;
@@ -220,15 +216,12 @@ function ifft2(Re, Im) {
   return z;
 }
 
-// ===== 单面 SRM 生成 =====
+// ===== 单面 SRM 生成：在频域构造一个具有目标功率谱的随机场 =====
 function makeSpectrumSingle(nx, ny, Lx, Ly, H, ax, ay, thetaDeg, rng) {
   const th = (thetaDeg * Math.PI) / 180;
-  const dkx = (2 * Math.PI) / Lx,
-    dky = (2 * Math.PI) / Ly;
-  const kx = lin(nx, dkx),
-    ky = lin(ny, dky);
-  const Re = create2D(ny, nx),
-    Im = create2D(ny, nx);
+  const dkx = (2 * Math.PI) / Lx, dky = (2 * Math.PI) / Ly;
+  const kx = lin(nx, dkx), ky = lin(ny, dky);
+  const Re = create2D(ny, nx), Im = create2D(ny, nx);
   const alpha = H + 1; // 振幅 ~ k^{-(H+1)} = k^{-(4-D)}
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
@@ -245,6 +238,7 @@ function makeSpectrumSingle(nx, ny, Lx, Ly, H, ax, ay, thetaDeg, rng) {
   return { Re, Im };
 }
 
+// 主函数：generateSurface
 /**
  * 生成单张自仿射粗糙表面（经典 SRM）
  * @param {Object} opts
@@ -258,7 +252,7 @@ function makeSpectrumSingle(nx, ny, Lx, Ly, H, ax, ay, thetaDeg, rng) {
  *  - seed: 随机种子
  * @returns {{ Z: number[][], meta: Object }}
  */
-export function generateAUPGSingle({
+export function generateSurface({
   nx = 512,
   ny = 512,
   L = 0.1,
@@ -270,12 +264,10 @@ export function generateAUPGSingle({
   seed = 799753397,
 } = {}) {
   const H = 3 - D;
-  const ax = anisotropy,
-    ay = 1.0;
-  const Lx = L,
-    Ly = L;
+  const ax = anisotropy, ay = 1.0; // 各向异性参数：ax = anisotropy，ay 固定 1
+  const Lx = L, Ly = L; // 正方形域
   const rng = makeRNG(rngKind, seed);
-
+  // 调用 makeSpectrumSingle：在频域生成带有分形谱的复数场 (Re, Im)
   const { Re, Im } = makeSpectrumSingle(
     nx,
     ny,
@@ -295,5 +287,3 @@ export function generateAUPGSingle({
     meta: { nx, ny, L, D, H, sigma, anisotropy, thetaDeg, rngKind, seed },
   };
 }
-
-export const generateAUPG = (opts) => generateAUPGSingle(opts);

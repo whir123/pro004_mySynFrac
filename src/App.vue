@@ -2,7 +2,7 @@
   <!-- 最外层：两列 CSS Grid 布局：左列参数面板，右列预览 -->
   <div class="grid">
     <div class="panel">
-      <h2 style="margin:0 0 8px">分形维数单元基底生成</h2>
+      <h2 style="margin:0 0 8px">分形维数粗糙面生成器</h2>
       <hr />
 
       <!-- 随机数发生器 | 单选组 + 两个种子 -->
@@ -72,7 +72,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { generateAUPG } from './lib/srm' // 核心算法（频域自仿射 + AUPG 匹配），返回 { Z, meta }。
+import { generateSurface } from './lib/srm' // 核心算法（频域自仿射 + AUPG 匹配），返回 { Z, meta }。
 import { gridToSTL } from './lib/stl'
 import SurfaceViewer from './components/SurfaceViewer.vue'
 
@@ -120,7 +120,7 @@ function remapZ_toRangeZero(z, targetRange) {
 // ========= 生成后立刻重标定 预览为“重标定后” =========
 function run() {
   const t0 = performance.now()
-  const { Z } = generateAUPG({
+  const { Z } = generateSurface({
     nx: nx.value, ny: ny.value, L: L.value,
     D: D.value,
     sigma: stdMM.value / 1000, // SRM 阶段仍然按 σ 定标
@@ -148,7 +148,7 @@ function saveBlob(blob, filename) {
 function exportSTL() {
   if (!ZB.value) return
   const finalBlob = gridToSTL(ZB.value, L.value, L.value, 'surface_bottom')
-  saveBlob(finalBlob, 'surface_bottom.stl')
+  saveBlob(finalBlob, 'surface.stl')
 }
 </script>
 

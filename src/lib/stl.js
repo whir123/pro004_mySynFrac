@@ -45,4 +45,3 @@ export function gridToSTL(z, Lx, Ly, name = "surface") {
   lines.push(`endsolid ${name}`);
   return new Blob([lines.join("\n")], { type: "model/stl" });
 };
-

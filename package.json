@@ -1,7 +1,7 @@
 {
-  "name": "my-synfrac",
-  "version": "0.1.0",
-  "description": "AUPG Synthetic Fracture",
+  "name": "fdrsg",
+  "version": "0.2.0",
+  "description": "Fractal dimension rough surface generator",
   "private": true,
   "type": "module",
   "author": "LZK <LZK@example.com>",
