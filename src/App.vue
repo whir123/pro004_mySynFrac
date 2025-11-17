@@ -35,7 +35,7 @@
         <!-- 部分旧参数废弃 -->
         <div class="row">
           <div><label>Physical size (mm)</label><input type="number" v-model.number="sizeMM" step="1" /></div>
-          <div><label>Standard deviation (mm)</label><input type="number" v-model.number="stdMM" step="0.01" /></div>
+          <div><label>Elevation drop (mm)</label><input type="number" v-model.number="stdMM" step="0.01" /></div>
         </div>
         <!-- <div class="row"> -->
           <!-- <div><label>Mismatch length (mm)</label><input type="number" v-model.number="mismatchMM" step="1" /></div> -->
